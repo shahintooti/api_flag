@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="fa">
+<head>
+    <link rel="icon" type="1.jpg" href="1.jpg">
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Country information</title>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        body {
+            background-image:url('1.jpg');
+            background-size:cover;
+            transition: background 0.5s, color 0.5s;
+            font-family: sans-serif;
+        }
+        body.dark { background:black !important; color:white; }
+
+        .glass {
+            backdrop-filter: blur(15px);
+            background: rgba(255,255,255,0.15);
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0px 0px 30px rgba(255,255,255,0.3);
+        }
+
+        #flag_image {
+            width: 250px;
+            border-radius: 20px;
+            transition: all 0.6s ease;
+            opacity: 0;
+            transform: rotateY(60deg) scale(0.8);
+        }
+        #flag_image.show { opacity: 1; transform: rotateY(0deg) scale(1); }
+
+        #suggestions {
+            background: rgba(255,255,255,0.8);
+            border-radius: 10px;
+            box-shadow: 0px 0px 15px rgba(0,0,0,0.2);
+            margin-top: 5px;
+            text-align: left;
+            max-height: 200px;
+            overflow-y: auto;
+            display: none;
+        }
+        #suggestions div { padding: 10px; cursor: pointer; }
+        #suggestions div:hover { background: #f0f0f0; }
+
+        #info_box, #favorites { margin-top: 20px; padding: 20px; border-radius: 15px; }
+
+        .lang-btn { margin: 5px; }
+
+        #compare_box { margin-top: 30px; }
+        #compare_result { margin-top: 15px; }
+    </style>
+</head>
+
+<body>
+    <div style="text-align:center; margin-top:30px;">
+
+        <button class="btn btn-dark" onclick="toggleDarkMode()">Dark Mode</button>
+        <button class="btn btn-primary lang-btn" onclick="setLang('fa')">فارسی</button>
+        <button class="btn btn-secondary lang-btn" onclick="setLang('en')">English</button>
+
+        <div class="glass" style="width:700px; margin:auto; margin-top:40px;">
+            <div class="input-group input-group-lg">
+                <span class="input-group-text" id="label_country">کشور</span>
+                <input id="country_input" type="text" class="form-control" onkeyup="autoComplete()">
+                <button class="btn btn-success" onclick="flag()" id="btn_search">جستجو</button>
+                <button class="btn btn-info" onclick="voiceSearch()" id="btn_voice">🎤</button>
+            </div>
+
+            <div id="suggestions"></div>
+
+            <br><br>
+
+            <img id="flag_image" src="2.jpg">
+
+            <div id="info_box" class="glass"></div>
+
+            <br>
+
+            <button class="btn btn-warning" onclick="addFavorite()" id="btn_fav">افزودن به علاقه‌مندی‌ها</button>
+            <div id="favorites" class="glass"></div>
+
+            <br><br>
+
+            <h3 id="label_chart">نمودار جمعیت</h3>
+            <canvas id="popChart" width="400" height="200"></canvas>
+
+            <br><br>
+
+            <h3 id="label_map">نقشه کشور</h3>
+            <iframe id="map_frame" width="100%" height="300" style="border-radius:15px;" loading="lazy"></iframe>
+
+            <!-- بخش مقایسه کشورها -->
+            <div id="compare_box" class="glass">
+                <h3 id="label_compare_title">مقایسه کشورها</h3>
+                <div class="input-group">
+                    <span class="input-group-text" id="label_compare1">کشور ۱</span>
+                    <input id="compare_input1" type="text" class="form-control">
+                </div>
+                <br>
+                <div class="input-group">
+                    <span class="input-group-text" id="label_compare2">کشور ۲</span>
+                    <input id="compare_input2" type="text" class="form-control">
+                </div>
+                <br>
+                <button class="btn btn-outline-light" onclick="compareCountries()" id="btn_compare">مقایسه</button>
+
+                <div id="compare_result"></div>
+            </div>
+        </div>
+    </div>
+
+<script>
+let allCountries = [];
+let favorites = JSON.parse(localStorage.getItem("favorites") || "[]");
+let currentLang = "fa";
+
+fetch("https://studies.cs.helsinki.fi/restcountries/api/all")
+    .then(res => res.json())
+    .then(data => allCountries = data);
+
+function toggleDarkMode() {
+    document.body.classList.toggle("dark");
+}
+
+function setLang(lang) {
+    currentLang = lang;
+
+    if (lang === "fa") {
+        document.getElementById("label_country").innerText = "کشور";
+        document.getElementById("btn_search").innerText = "جستجو";
+        document.getElementById("btn_fav").innerText = "افزودن به علاقه‌مندی‌ها";
+        document.getElementById("label_chart").innerText = "نمودار جمعیت";
+        document.getElementById("label_map").innerText = "نقشه کشور";
+        document.getElementById("label_compare_title").innerText = "مقایسه کشورها";
+        document.getElementById("label_compare1").innerText = "کشور ۱";
+        document.getElementById("label_compare2").innerText = "کشور ۲";
+        document.getElementById("btn_compare").innerText = "مقایسه";
+    } else {
+        document.getElementById("label_country").innerText = "Country";
+        document.getElementById("btn_search").innerText = "Search";
+        document.getElementById("btn_fav").innerText = "Add to Favorites";
+        document.getElementById("label_chart").innerText = "Population Chart";
+        document.getElementById("label_map").innerText = "Country Map";
+        document.getElementById("label_compare_title").innerText = "Compare Countries";
+        document.getElementById("label_compare1").innerText = "Country 1";
+        document.getElementById("label_compare2").innerText = "Country 2";
+        document.getElementById("btn_compare").innerText = "Compare";
+    }
+}
+
+function autoComplete() {
+    let input = document.getElementById("country_input").value.toLowerCase();
+    let box = document.getElementById("suggestions");
+
+    if (input.length < 1) {
+        box.style.display = "none";
+        return;
+    }
+
+    let matches = allCountries.filter(c =>
+        c.name.common.toLowerCase().includes(input) ||
+        c.translations.fas?.common?.toLowerCase().includes(input)
+    );
+
+    box.innerHTML = "";
+    matches.slice(0, 10).forEach(c => {
+        let div = document.createElement("div");
+        div.innerText = c.name.common;
+        div.onclick = () => {
+            document.getElementById("country_input").value = c.name.common;
+            box.style.display = "none";
+            flag();
+        };
+        box.appendChild(div);
+    });
+
+    box.style.display = "block";
+}
+
+function findCountry(name) {
+    name = name.toLowerCase();
+    return allCountries.find(c =>
+        c.name.common.toLowerCase() === name ||
+        c.translations.fas?.common?.toLowerCase() === name ||
+        c.name.common.toLowerCase().includes(name)
+    );
+}
+
+function flag() {
+    let country = document.getElementById("country_input").value.trim();
+    let found = findCountry(country);
+
+    if (!found) {
+        alert(currentLang === "fa" ? "کشور پیدا نشد" : "Country not found");
+        return;
+    }
+
+    let flagImg = document.getElementById("flag_image");
+    flagImg.src = found.flags.png;
+    flagImg.classList.remove("show");
+    setTimeout(() => flagImg.classList.add("show"), 50);
+
+    let info = `
+        <h3>${found.name.common}</h3>
+        <p><b>${currentLang === "fa" ? "پایتخت" : "Capital"}:</b> ${found.capital}</p>
+        <p><b>${currentLang === "fa" ? "جمعیت" : "Population"}:</b> ${found.population.toLocaleString()}</p>
+        <p><b>${currentLang === "fa" ? "قاره" : "Region"}:</b> ${found.region}</p>
+        <p><b>${currentLang === "fa" ? "زبان‌ها" : "Languages"}:</b> ${Object.values(found.languages || {}).join(", ")}</p>
+        <p><b>${currentLang === "fa" ? "واحد پول" : "Currencies"}:</b> ${Object.values(found.currencies || {}).map(c => c.name).join(", ")}</p>
+    `;
+
+    let infoBox = document.getElementById("info_box");
+    infoBox.innerHTML = info;
+    infoBox.style.display = "block";
+
+    document.getElementById("map_frame").src =
+        `https://www.google.com/maps?q=${found.name.common}&output=embed`;
+
+    drawChart(found.population);
+}
+
+function addFavorite() {
+    let country = document.getElementById("country_input").value.trim();
+    if (!country) return;
+
+    favorites.push(country);
+    localStorage.setItem("favorites", JSON.stringify(favorites));
+
+    let favBox = document.getElementById("favorites");
+    favBox.innerHTML = "<h4>Favorites:</h4>" + favorites.map(f => `<p>${f}</p>`).join("");
+}
+
+function drawChart(pop) {
+    const ctx = document.getElementById('popChart').getContext('2d');
+
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: ['Population'],
+            datasets: [{
+                label: 'Population',
+                data: [pop],
+                backgroundColor: ['rgba(0, 123, 255, 0.6)']
+            }]
+        }
+    });
+}
+
+// جستجوی صوتی
+function voiceSearch() {
+    if (!('webkitSpeechRecognition' in window)) {
+        alert(currentLang === "fa" ? "مرورگر از جستجوی صوتی پشتیبانی نمی‌کند" : "Browser doesn't support voice search");
+        return;
+    }
+
+    let recognition = new webkitSpeechRecognition();
+    recognition.lang = currentLang === "fa" ? "fa-IR" : "en-US";
+    recognition.start();
+
+    recognition.onresult = function(event) {
+        let text = event.results[0][0].transcript;
+        document.getElementById("country_input").value = text;
+        flag();
+    };
+}
+
+// مقایسه کشورها
+function compareCountries() {
+    let c1 = document.getElementById("compare_input1").value.trim();
+    let c2 = document.getElementById("compare_input2").value.trim();
+
+    let country1 = findCountry(c1);
+    let country2 = findCountry(c2);
+
+    if (!country1 || !country2) {
+        alert(currentLang === "fa" ? "یکی از کشورها پیدا نشد" : "One of the countries not found");
+        return;
+    }
+
+    let html = `
+        <div class="row">
+            <div class="col-md-6">
+                <h4>${country1.name.common}</h4>
+                <p><b>${currentLang === "fa" ? "پایتخت" : "Capital"}:</b> ${country1.capital}</p>
+                <p><b>${currentLang === "fa" ? "جمعیت" : "Population"}:</b> ${country1.population.toLocaleString()}</p>
+                <p><b>${currentLang === "fa" ? "قاره" : "Region"}:</b> ${country1.region}</p>
+            </div>
+            <div class="col-md-6">
+                <h4>${country2.name.common}</h4>
+                <p><b>${currentLang === "fa" ? "پایتخت" : "Capital"}:</b> ${country2.capital}</p>
+                <p><b>${currentLang === "fa" ? "جمعیت" : "Population"}:</b> ${country2.population.toLocaleString()}</p>
+                <p><b>${currentLang === "fa" ? "قاره" : "Region"}:</b> ${country2.region}</p>
+            </div>
+        </div>
+    `;
+
+    document.getElementById("compare_result").innerHTML = html;
+}
+</script>
+
+</body>
+</html>
